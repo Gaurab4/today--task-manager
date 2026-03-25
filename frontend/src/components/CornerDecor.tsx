@@ -5,7 +5,7 @@ import type {
   Scene,
   WebGLRenderer,
 } from 'three'
-import type { Theme } from './theme'
+import type { Theme } from '../lib/theme'
 
 type Props = { theme: Theme }
 

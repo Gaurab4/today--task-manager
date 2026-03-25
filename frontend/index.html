@@ -10,18 +10,13 @@
         var k = 'zen-theme'
         try {
           var t = localStorage.getItem(k)
-          var theme =
-            t === 'light' || t === 'dark'
-              ? t
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light'
+          var theme = t === 'light' || t === 'dark' ? t : 'dark'
           document.documentElement.dataset.theme = theme
           document.documentElement.style.colorScheme =
             theme === 'dark' ? 'dark' : 'light'
         } catch (e) {
-          document.documentElement.dataset.theme = 'light'
-          document.documentElement.style.colorScheme = 'light'
+          document.documentElement.dataset.theme = 'dark'
+          document.documentElement.style.colorScheme = 'dark'
         }
       })()
     </script>
