@@ -974,6 +974,7 @@
   position: absolute;
   left: 3px;
   right: 3px;
+  box-sizing: border-box;
   border-radius: 6px;
   border: 1px solid;
   padding: 0.2rem 0.45rem;
