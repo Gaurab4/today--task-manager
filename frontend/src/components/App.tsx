@@ -16,6 +16,13 @@ import {
 import { CornerDecor } from './CornerDecor'
 import { DayCalendar } from './DayCalendar'
 import { PersonFigure } from './PersonFigure'
+import {
+  loadMonthGoalsLines,
+  monthKeyFromDateKey,
+  newMonthGoalLine,
+  saveMonthGoalsLines,
+  type MonthGoalLine,
+} from '../lib/monthGoals'
 import { loadTasksForDate, saveTasksForDate, todayKey } from '../lib/storage'
 import { applyTheme, readThemeFromDom, type Theme } from '../lib/theme'
 import type { Subtask, SubtaskListStyle, Task } from '../types/task'
@@ -131,6 +138,7 @@ export default function App() {
   const exitTransitionDoneRef = useRef(false)
   const subtaskGutterRef = useRef<HTMLDivElement>(null)
   const subtaskTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const monthGoalInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   const onSubtaskTextareaScroll = (
     e: React.UIEvent<HTMLTextAreaElement>,
@@ -177,6 +185,70 @@ export default function App() {
   useEffect(() => {
     saveTasksForDate(dateKey, tasks)
   }, [dateKey, tasks])
+
+  const monthKey = useMemo(() => monthKeyFromDateKey(dateKey), [dateKey])
+  const monthLabel = useMemo(() => {
+    const [y, mo] = monthKey.split('-').map(Number)
+    const dt = new Date(y, mo - 1, 1)
+    return dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  }, [monthKey])
+
+  const [monthGoalLines, setMonthGoalLines] = useState<MonthGoalLine[]>(() =>
+    loadMonthGoalsLines(monthKeyFromDateKey(todayKey())),
+  )
+
+  useEffect(() => {
+    setMonthGoalLines(loadMonthGoalsLines(monthKey))
+  }, [monthKey])
+
+  const updateMonthGoalLine = (id: string, text: string) => {
+    setMonthGoalLines((prev) => {
+      const next = prev.map((l) => (l.id === id ? { ...l, text } : l))
+      saveMonthGoalsLines(monthKey, next)
+      return next
+    })
+  }
+
+  const removeMonthGoalLine = (id: string) => {
+    setMonthGoalLines((prev) => {
+      if (prev.length <= 1) {
+        const next = [{ ...prev[0], text: '' }]
+        saveMonthGoalsLines(monthKey, next)
+        return next
+      }
+      const next = prev.filter((l) => l.id !== id)
+      saveMonthGoalsLines(monthKey, next)
+      return next
+    })
+  }
+
+  const onMonthGoalKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    lineId: string,
+  ) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const idx = monthGoalLines.findIndex((l) => l.id === lineId)
+    if (idx === -1) return
+    if (idx < monthGoalLines.length - 1) {
+      const nextId = monthGoalLines[idx + 1].id
+      requestAnimationFrame(() => {
+        monthGoalInputRefs.current.get(nextId)?.focus()
+      })
+      return
+    }
+    const newLine = newMonthGoalLine()
+    setMonthGoalLines((prev) => {
+      const next = [...prev, newLine]
+      saveMonthGoalsLines(monthKey, next)
+      return next
+    })
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        monthGoalInputRefs.current.get(newLine.id)?.focus()
+      })
+    })
+  }
 
   useEffect(() => {
     if (!sheetOpen || prefersReducedMotion) return
@@ -436,6 +508,53 @@ export default function App() {
     <>
       <CornerDecor theme={theme} />
       <div className="app-shell">
+        <aside className="app-goals" aria-label="Monthly goals">
+          <div className="month-goals-panel">
+            <h2 className="month-goals-panel__title" id="month-goals-heading">
+              {monthLabel}
+            </h2>
+            <p className="month-goals-panel__sub">Monthly goals</p>
+            <div className="month-goals-panel__notebook">
+              <ul
+                className="month-goals-lines"
+                aria-labelledby="month-goals-heading"
+              >
+                {monthGoalLines.map((line, index) => (
+                  <li key={line.id} className="month-goals-line">
+                    <span className="month-goals-line__gutter" aria-hidden>
+                      {index + 1}.
+                    </span>
+                    <input
+                      type="text"
+                      className="month-goals-line__input"
+                      ref={(el) => {
+                        if (el) monthGoalInputRefs.current.set(line.id, el)
+                        else monthGoalInputRefs.current.delete(line.id)
+                      }}
+                      value={line.text}
+                      onChange={(e) =>
+                        updateMonthGoalLine(line.id, e.target.value)
+                      }
+                      onKeyDown={(e) => onMonthGoalKeyDown(e, line.id)}
+                      placeholder="Type a goal…"
+                      spellCheck
+                      aria-label={`Goal ${index + 1}`}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost month-goals-line__remove"
+                      onClick={() => removeMonthGoalLine(line.id)}
+                      aria-label={`Remove goal ${index + 1}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </aside>
+
         <div className="app app-main">
           <header className="app-header">
             <div>
@@ -461,10 +580,11 @@ export default function App() {
             </div>
           </header>
 
-          <p className="app-philosophy">
-            One day, one list. Categories and subtasks keep the day clear—use
-            the timeline on the right to see your day by time.
-          </p>
+          <div className="app-main-notes">
+            <p className="app-main-notes__intro">
+              One day, one list. Categories and subtasks keep the day clear—use
+              the timeline on the right to see your day by time.
+            </p>
 
           <div className="app-list-region">
             {sortedForList.length === 0 ? (
@@ -568,6 +688,7 @@ export default function App() {
                 })}
               </ul>
             )}
+          </div>
           </div>
         </div>
 
